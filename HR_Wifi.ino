@@ -3,6 +3,10 @@ const char *password;
 const char *hostNameBase = "heatreg_";
 String      hostName;
 
+// Build Information for a NodeMCU:
+// - Choose an ESP8266 variant, specifically Generic ESP8266 Module.
+// - Set the Flash Size to 4 MB, No SPIFFS.   Mostly so we can do OTA updates.
+
 // Web server information
 
 // State related to moving the servo to a new location.  We wait a bit after the last command to actually move,
@@ -28,6 +32,10 @@ int     blinkCount      =   0;    // How many times we've blinked.
 ESP8266WebServer server(80);
 
 void initWifi() {
+  // Set the device mode to "station" to avoid avoid creating a FairlyLink AP
+  //  https://arduino.stackexchange.com/questions/47806/what-is-farylink-access-point
+  WiFi.mode( WIFI_STA );
+
   // Initialize defaults from HR_WifiConfig
   initWifiConfig();
 
