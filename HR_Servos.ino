@@ -201,16 +201,16 @@ void initServos() {
   servoObj[ SERVO_LEFT ]->loadFromEEPROM();
   servoObj[ SERVO_RIGHT ]->loadFromEEPROM();
 
-  // Go to the 50% position
-  servoObj[ SERVO_LEFT  ]->attachAndWritePercent( 0.5, "initServos" );
-  servoObj[ SERVO_RIGHT ]->attachAndWritePercent( 0.5, "initServos" );
+  // Go to the open (100% "on") position
+  servoObj[ SERVO_LEFT  ]->attachAndWritePercent( 1.0, "initServos" );
+  servoObj[ SERVO_RIGHT ]->attachAndWritePercent( 1.0, "initServos" );
 
   delay( SERVO_MOVE_TIME );
   
   servoObj[ SERVO_LEFT  ]->detach();
   servoObj[ SERVO_RIGHT ]->detach();
 
-  Serial.println( "- Servos moved to 50% position" );
+  Serial.println( "- Servos moved to open position" );
 }
 
 // Move the damper to a given percentage of open.  0 is closed, 100 is open.

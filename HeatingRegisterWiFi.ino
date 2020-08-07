@@ -35,6 +35,7 @@ void setup() {
   Serial.begin( 115200 );
   Serial.println( "\n...Starting up..." );
 
+  pinMode(      LED_BUILTIN, OUTPUT );
   digitalWrite( LED_BUILTIN, LOW    );
 
   // Initialize the EEPROM emulation on the ESP8266.  64 bytes is more than enough.
@@ -43,7 +44,6 @@ void setup() {
   // Set the LED state
   ledState = EEPROM.read( FLASHOFFSET_LED_STATE ) ? 1 : 0;
 
-  pinMode(      LED_BUILTIN, OUTPUT );
   digitalWrite( LED_BUILTIN, ledState ? LOW : HIGH );
 
   // Init other systems

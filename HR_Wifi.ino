@@ -28,6 +28,11 @@ bool    showHTTPStatusRequests = false;   // When true HTTP status requests are 
 int     blinkTime       =   0;    // Time since we last changed the LED.  0 if blinking is off.
 int     blinkCount      =   0;    // How many times we've blinked.
 
+// Wifi Disconnected Blinking
+int     wifiBlinkPeriods[2] = { 100, 300 };   // Time in milliseconds before next blink
+int     wifiLastBlinkTime   = 0;              // millis() that the last blink was performed at
+int     wifiBlinkCount      = 0;              // Which blink, incremented each blink, %2 to get the index in the array
+
 // Web server
 ESP8266WebServer server(80);
 
@@ -89,12 +94,13 @@ void initWifi() {
   });
   ArduinoOTA.onEnd([]() {
     Serial.println("OTA: End");
+    digitalWrite( LED_BUILTIN, ledState ? LOW : HIGH );
   });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
     Serial.printf("OTA: Progress: %u%%\r", (progress / (total / 100)));
 
-    static int ledState = 0;
-    digitalWrite( LED_BUILTIN, ledState++ ? HIGH : LOW );
+    static int tempLedState = 0;
+    digitalWrite( LED_BUILTIN, tempLedState++ % 2 ? HIGH : LOW );
   });
   ArduinoOTA.onError([](ota_error_t error) {
     Serial.printf("Error[%u]: ", error);
@@ -108,15 +114,19 @@ void initWifi() {
   Serial.println("- ArduinoOTA Initialized" );
   
   // Start up wifi and connect
-  Serial.print("- Connecting to wifi at " );
+  Serial.print( "- Connecting to wifi at " );
   Serial.print( ssid );
-  WiFi.begin(ssid, password);
+  WiFi.begin( ssid, password );
 
   // Wait for connection
+  int tempLedState = 0;
   while (WiFi.status() != WL_CONNECTED) {
-    delay(250);
+    digitalWrite( LED_BUILTIN, tempLedState++ % 2 ? HIGH : LOW );
+
+    delay(200);
     Serial.print(".");
   }
+  digitalWrite( LED_BUILTIN, ledState ? LOW : HIGH );
 
   Serial.println(" done." );
   Serial.print("- Connected to ");
@@ -228,7 +238,7 @@ void initWifi() {
       blinkTime = millis();
     } else {
       // Stop
-      digitalWrite( LED_BUILTIN, LOW );
+      digitalWrite( LED_BUILTIN, ledState ? LOW : HIGH );
       blinkTime = 0;
     }
 
@@ -312,11 +322,33 @@ void loopWifi() {
     if( millis() > blinkTime + BLINK_PERIOD ) {
       if( blinkCount++ > MAX_BLINKS ) {
         blinkTime = blinkCount = 0;
-        digitalWrite( LED_BUILTIN, LOW );
+        digitalWrite( LED_BUILTIN, ledState ? LOW : HIGH );
       } else {
         blinkTime = millis();
         digitalWrite( LED_BUILTIN, blinkCount % 2 ? LOW : HIGH );
       }
+    }
+
+  } else if( WiFi.status() != WL_CONNECTED ) {
+    // If we're not connected, we flash the LED on a 2:1 ratio
+    if( wifiBlinkCount == 0 ) {
+      Serial.println("Wifi connection lost; attempting to reconnect..." );
+      wifiBlinkCount = 1;
+    }
+
+    if( (millis() - wifiLastBlinkTime) > wifiBlinkPeriods[ wifiBlinkCount % 2 ] ) {
+        wifiLastBlinkTime = millis();
+        wifiBlinkCount++;
+
+        Serial.print( "." );
+        digitalWrite( LED_BUILTIN, wifiBlinkCount % 2 ? LOW : HIGH );
+    }
+
+  } else {
+    if( wifiBlinkCount > 0 ) {
+      Serial.println("Wifi connection restored." );
+      wifiBlinkCount = 0;
+      digitalWrite( LED_BUILTIN, ledState ? LOW : HIGH );
     }
   }
 
