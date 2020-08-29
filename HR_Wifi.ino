@@ -33,6 +33,10 @@ int     wifiBlinkPeriods[2] = { 100, 300 };   // Time in milliseconds before nex
 int     wifiLastBlinkTime   = 0;              // millis() that the last blink was performed at
 int     wifiBlinkCount      = 0;              // Which blink, incremented each blink, %2 to get the index in the array
 
+// Wifi Timeout
+int wifiDisconnectedTime    = 0;              // When we disconnected
+#define WIFIDISCONNECTED_REBOOT_TIMEOUT (1000 * 60 * 5)   // How long to wait in milliseconds (5 minutes) when disconnected before just rebooting
+
 // Web server
 ESP8266WebServer server(80);
 
@@ -151,7 +155,7 @@ void initWifi() {
     server.send(200, "text/plain", "Register open (on)");
     Serial.println("HTTP: Register open (on)");
     actionTime  = millis();
-    actionPos   = 100;
+    actionPos   = OPENDAMPERTO_FULL_OPEN;
     actionSpeed = servoSpeed;
   });
  
@@ -159,7 +163,7 @@ void initWifi() {
     server.send(200, "text/plain", "Register closed (off)");
     Serial.println("HTTP: Register closed (off)");
     actionTime  = millis();
-    actionPos   = 0;
+    actionPos   = OPENDAMPERTO_FULL_CLOSED;
     actionSpeed = servoSpeed;
   });
  
@@ -250,14 +254,14 @@ void initWifi() {
   // Open/close as fast as possible
   server.on("/config/onFast", [](){
     actionTime = millis();
-    actionPos  = 100;
+    actionPos  = OPENDAMPERTO_FULL_OPEN;
     server.send(200, "text/html", generateConfigPage());
     Serial.println("HTTP: config/onFast: damper opened");
   });
 
   server.on("/config/offFast", [](){
     actionTime  = millis();
-    actionPos = 0;
+    actionPos = OPENDAMPERTO_FULL_CLOSED;
     server.send(200, "text/html", generateConfigPage());
     Serial.println("HTTP: config/offFast: damper closed");
   });
@@ -265,7 +269,7 @@ void initWifi() {
   // Open/close using the current speed setting
   server.on("/config/on", [](){
     actionTime  = millis();
-    actionPos   = 100;
+    actionPos   = OPENDAMPERTO_FULL_OPEN;
     actionSpeed = servoSpeed;
     server.send(200, "text/html", generateConfigPage());
     Serial.println("HTTP: config/on: damper opened");
@@ -273,7 +277,7 @@ void initWifi() {
 
   server.on("/config/off", [](){
     actionTime  = millis();
-    actionPos   = 0;
+    actionPos   = OPENDAMPERTO_FULL_CLOSED;
     actionSpeed = servoSpeed;
     server.send(200, "text/html", generateConfigPage());
     Serial.println("HTTP: config/off: damper closed");
@@ -281,15 +285,11 @@ void initWifi() {
 
   // Reboot, which is necessary after changing the hostname.
   server.on("/config/reboot", [](){
-    openDamperTo( 0 );
+    openDamperTo( OPENDAMPERTO_FULL_OPEN );
     server.send(200, "text/html", rebootingPage());
     Serial.println("HTTP: config/reboot: rebooting...");
     delay( 2000 );      // Wait for the "rebooting" page to actually be sent before rebooting
     ESP.restart();
-  });
-
-  server.onNotFound( [] {
-    server.send(404, "text/plain", "File Not Found\n");
   });
 
   server.onNotFound( [] {
@@ -332,8 +332,10 @@ void loopWifi() {
   } else if( WiFi.status() != WL_CONNECTED ) {
     // If we're not connected, we flash the LED on a 2:1 ratio
     if( wifiBlinkCount == 0 ) {
+      // Initialize disconnected state
       Serial.println("Wifi connection lost; attempting to reconnect..." );
       wifiBlinkCount = 1;
+      wifiDisconnectedTime = millis();
     }
 
     if( (millis() - wifiLastBlinkTime) > wifiBlinkPeriods[ wifiBlinkCount % 2 ] ) {
@@ -342,6 +344,14 @@ void loopWifi() {
 
         Serial.print( "." );
         digitalWrite( LED_BUILTIN, wifiBlinkCount % 2 ? LOW : HIGH );
+    }
+
+    if( (millis() - wifiDisconnectedTime) > WIFIDISCONNECTED_REBOOT_TIMEOUT ) {
+      // This is taking too long; reboot and try to reconnect that way
+      openDamperTo( OPENDAMPERTO_FULL_OPEN );
+      Serial.println( "Wifi disconnected for too long: rebooting..." );
+      delay( 2000 );      // Wait for the "rebooting" info to be printed
+      ESP.restart();
     }
 
   } else {

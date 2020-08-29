@@ -214,6 +214,8 @@ void initServos() {
 }
 
 // Move the damper to a given percentage of open.  0 is closed, 100 is open.
+#define OPENDAMPERTO_FULL_OPEN    100
+#define OPENDAMPERTO_FULL_CLOSED    0
 void openDamperTo_Attach() {
   servoObj[ SERVO_LEFT  ]->attach();
   servoObj[ SERVO_RIGHT ]->attach( );
