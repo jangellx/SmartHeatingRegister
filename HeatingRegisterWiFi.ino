@@ -2,8 +2,15 @@
 #include <Servo.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <ESP8266HTTPClient.h>
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
+
+// Build Settings:
+//   Board: Generic ESP8266 Module
+//   Flash Size:  4M (No SPIFF), unless you want to wipe the entire flash
+// All others at deafults
+
 
 // Flash Memory Info
 //  We store basic settings in flash memory, such as servo open/closed positions,

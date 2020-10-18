@@ -1,7 +1,10 @@
+// Configuration Variables
 const char *ssid;
 const char *password;
 const char *hostNameBase = "heatreg_";
 String      hostName;
+
+const char *webhooksURL = NULL;     // IP and port of the HTTPWebhoooks service, without the trailing slash.  ie: http://192.168.1.231:51930
 
 // Build Information for a NodeMCU:
 // - Choose an ESP8266 variant, specifically Generic ESP8266 Module.
@@ -36,6 +39,42 @@ int     wifiBlinkCount      = 0;              // Which blink, incremented each b
 // Wifi Timeout
 int wifiDisconnectedTime    = 0;              // When we disconnected
 #define WIFIDISCONNECTED_REBOOT_TIMEOUT (1000 * 60 * 5)   // How long to wait in milliseconds (5 minutes) when disconnected before just rebooting
+
+// Reset the action state, usually when the motion has completed
+void ResetActionState(void) {
+  actionTime       =   0;
+  actionPosOld     =   actionPos;
+  actionPos        =  -1;
+  actionSpeed      = 255;
+  actionStartTime =    0;
+}
+
+// Called to let the WebHooks client know that our state has updated.
+void UpdateWebhooks(void) {
+  if( webhooksURL == NULL )
+    return;
+
+  String url = String( webhooksURL) + "/?accessoryId=" + String( hostName ) + "&state=" + String( damperIsOpen() ? "true" : "false" );
+  Serial.print( "Updating HTTPWebhooks with new state of " );
+  Serial.print( damperIsOpen() ? "true" : "false" );
+  Serial.print( " at " );
+  Serial.println( url );
+  
+  HTTPClient  http;
+  http.begin( url );
+  int error = http.sendRequest( "PUT" );
+  
+  if( error < 0 ) {
+    Serial.print(   " - HTTP PUT request failed:  " );
+    Serial.println( http.errorToString( error ) );
+  } else {
+    Serial.print(   " - HTTP response:  " );
+    Serial.println( error );
+    Serial.println( " ------------------------------ " );
+    Serial.println( http.getString() );
+    Serial.println( " ------------------------------ " );
+  }
+}
 
 // Web server
 ESP8266WebServer server(80);
@@ -300,6 +339,7 @@ void initWifi() {
   Serial.println("- HTTP server started");
 }
 
+// Handle key input from the main loop
 bool input_HTTP( char c ) {
   if( c == 'h' ) {
     showHTTPStatusRequests = !showHTTPStatusRequests;
@@ -367,7 +407,7 @@ void loopWifi() {
     // Wait for the action delay to pass
     if( (millis() - actionTime) >= ACTION_DELAY ) {
       if( actionSpeed == 255 ) {
-        // Move as fast as possible
+        // Move as fast as possible, after which we're done moving
         Serial.print( "Moving damper to " );
         Serial.print( actionPos );
         Serial.print( "% open..." );
@@ -376,9 +416,8 @@ void loopWifi() {
   
         Serial.println( "done." );
   
-        actionTime   =  0;
-        actionPosOld =  actionPos;
-        actionPos    = -1;
+        ResetActionState();
+        UpdateWebhooks();
 
       } else {
         // Use the given speed to move the servo more slowly
@@ -404,15 +443,12 @@ void loopWifi() {
           // Done moving
           openDamperTo_Move( actionPos );
   
-          actionTime       =   0;
-          actionPosOld     =   actionPos;
-          actionPos        =  -1;
-          actionSpeed      = 255;
-          actionStartTime =    0;
-  
 //          Serial.printf( "  %d > %d -- end\n", actionMillisDiff, speedInMillis );
           Serial.println( "done." );
   
+          ResetActionState();
+          UpdateWebhooks();
+
         } else {
           // Move the servos to the new position
           if( millis() - lastPrint > 50 ) {
